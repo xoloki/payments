@@ -1,31 +1,10 @@
-use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
 
 use payments::{Account, Ledger, PaymentError, Transaction};
 
-// bootstrap a ledger with one client that has one deposit tx
-fn make_ledger(client: u16, tx: u32, amount: Decimal) -> Ledger {
-    let mut ledger: Ledger = Default::default();
+mod helper;
 
-    assert_eq!(ledger.accounts.len(), 0);
-    
-    let deposit = Transaction {
-        tx_type: "deposit".to_string(),
-        client: client,
-        tx: tx,
-        amount: amount.to_string(),
-    };
-
-    ledger.process(&deposit).expect("Failed to process transaction");
-
-    assert_eq!(ledger.accounts.len(), 1);
-    
-    let account: &Account = ledger.accounts.get(&client).expect("Failed to get account for client");
-
-    assert_eq!(account.available, amount);
-
-    ledger
-}
+use helper::make_ledger;
 
 #[test]
 fn deposit() {
