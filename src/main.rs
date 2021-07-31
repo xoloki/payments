@@ -7,6 +7,7 @@ use std::error::Error;
 use std::fmt;
 use std::fs::File;
 use std::io::{BufReader, stdout};
+use std::str::FromStr;
 
 /*
 #[macro_use]
@@ -19,6 +20,7 @@ lazy_static! {
 */
 #[derive(Debug)]
 pub enum UpdateError {
+    BadDecimal,
     UnknownTxType,
     InsufficientFunds,
     DuplicateTransaction,
@@ -38,6 +40,7 @@ impl fmt::Display for UpdateError {
 impl Error for UpdateError {
     fn description(&self) -> &str {
         match self {
+            UpdateError::BadDecimal => "BadDecimal",
             UpdateError::UnknownTxType => "UnknownTxType",
             UpdateError::InsufficientFunds => "InsufficientFunds",
             UpdateError::AlreadyDisputed => "AlreadyDisputed",
@@ -56,7 +59,8 @@ struct Transaction {
     tx_type: String,
     client: u16,
     tx: u32,
-    amount: Decimal,
+    #[serde(default)]
+    amount: String,
 }
 
 #[derive(Debug, Serialize)]
@@ -87,7 +91,12 @@ impl Account {
 
     pub fn update(&mut self, tx: &Transaction, txs: &mut HashMap<u32, Transaction>, disputes: &mut HashSet<u32>) -> Result<(), UpdateError> {
         if tx.tx_type == "withdrawal" {
-            if self.available < tx.amount {
+            let amount = match Decimal::from_str(&tx.amount) {
+                Ok(amt) => amt,
+                Err(_) => return Err(UpdateError::BadDecimal)
+            };
+
+            if self.available < amount {
                 return Err(UpdateError::InsufficientFunds);
             }
 
@@ -96,17 +105,22 @@ impl Account {
             }
             
             txs.insert(tx.tx, tx.clone());
-            self.available -= tx.amount;
+            self.available -= amount;
             
             return Ok(());
 
         } else if tx.tx_type == "deposit" {
+            let amount = match Decimal::from_str(&tx.amount) {
+                Ok(amt) => amt,
+                Err(_) => return Err(UpdateError::BadDecimal)
+            };
+
             if txs.contains_key(&tx.tx) {
                 return Err(UpdateError::DuplicateTransaction);
             }
             
             txs.insert(tx.tx, tx.clone());
-            self.available += tx.amount;
+            self.available += amount;
             
             return Ok(());
 
@@ -130,12 +144,17 @@ impl Account {
             
             disputes.insert(tx.tx);
             
-            self.available -= tx.amount;
-            self.held += tx.amount;
+            let amount = match Decimal::from_str(&disputed_tx.amount) {
+                Ok(amt) => amt,
+                Err(_) => return Err(UpdateError::BadDecimal)
+            };
+
+            self.available -= amount;
+            self.held += amount;
             
             return Ok(());
 
-        } else if tx.tx_type == "resolve" {
+        } else if tx.tx_type == "resolve" || tx.tx_type == "chargeback" {
             if !disputes.contains(&tx.tx) {
                 return Err(UpdateError::NotDisputed);
             }
@@ -154,34 +173,19 @@ impl Account {
             }
             
             disputes.remove(&tx.tx);
-            
-            self.available += tx.amount;
-            self.held -= tx.amount;
-            
-            return Ok(());
 
-        } else if tx.tx_type == "chargeback" {
-            if !disputes.contains(&tx.tx) {
-                return Err(UpdateError::NotDisputed);
-            }
-
-            let disputed_tx = match txs.get(&tx.tx) {
-                Some(dtx) => dtx,
-                None => return Err(UpdateError::DisputedTxNotFound)
+            let amount = match Decimal::from_str(&disputed_tx.amount) {
+                Ok(amt) => amt,
+                Err(_) => return Err(UpdateError::BadDecimal)
             };
 
-            if disputed_tx.client != tx.client {
-                return Err(UpdateError::DisputedWrongClient);
+            if tx.tx_type == "resolve" {
+                self.available += amount;
+                self.held -= amount;
+            } else {
+                self.held -= amount;
+                self.locked = true;
             }
-            
-            if disputed_tx.tx_type != "deposit" {
-                return Err(UpdateError::InvalidDisputedTxType);
-            }
-            
-            disputes.remove(&tx.tx);
-            
-            self.held -= tx.amount;
-            self.locked = true;
             
             return Ok(());
 
