@@ -4,8 +4,6 @@ use std::error::Error;
 use std::fs::File;
 use std::io::{BufReader, stdout};
 
-mod payments;
-
 use payments::{Account, Metadata, Transaction};
 
 fn main() {
