@@ -2,9 +2,9 @@ use rust_decimal_macros::dec;
 
 use payments::{Account, PaymentError, Transaction};
 
-mod helper;
+mod helpers;
 
-use helper::{make_ledger, make_disputed_ledger};
+use helpers::{make_ledger, make_disputed_ledger};
 
 #[test]
 fn dispute() {
