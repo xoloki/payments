@@ -20,6 +20,7 @@ lazy_static! {
 */
 #[derive(Debug)]
 pub enum UpdateError {
+    AccountLocked,
     BadDecimal,
     UnknownTxType,
     InsufficientFunds,
@@ -40,6 +41,7 @@ impl fmt::Display for UpdateError {
 impl Error for UpdateError {
     fn description(&self) -> &str {
         match self {
+            UpdateError::AccountLocked => "AccountLocked",
             UpdateError::BadDecimal => "BadDecimal",
             UpdateError::UnknownTxType => "UnknownTxType",
             UpdateError::InsufficientFunds => "InsufficientFunds",
@@ -91,6 +93,10 @@ impl Account {
 
     pub fn update(&mut self, tx: &Transaction, txs: &mut HashMap<u32, Transaction>, disputes: &mut HashSet<u32>) -> Result<(), UpdateError> {
         if tx.tx_type == "withdrawal" {
+            if self.locked {
+                return Err(UpdateError::AccountLocked);
+            }
+
             let amount = match Decimal::from_str(&tx.amount) {
                 Ok(amt) => amt,
                 Err(_) => return Err(UpdateError::BadDecimal)
@@ -110,6 +116,10 @@ impl Account {
             return Ok(());
 
         } else if tx.tx_type == "deposit" {
+            if self.locked {
+                return Err(UpdateError::AccountLocked);
+            }
+
             let amount = match Decimal::from_str(&tx.amount) {
                 Ok(amt) => amt,
                 Err(_) => return Err(UpdateError::BadDecimal)
