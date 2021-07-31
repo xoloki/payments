@@ -6,9 +6,9 @@ use std::error::Error;
 use std::fmt;
 use std::str::FromStr;
 
-// the set of errors which can happen durin
+// the set of errors which can happen during
 #[derive(Debug)]
-pub enum UpdateError {
+pub enum PaymentError {
     AccountLocked,
     BadDecimal,
     UnknownTxType,
@@ -21,29 +21,30 @@ pub enum UpdateError {
     InvalidDisputedTxType,
 }
 
-impl fmt::Display for UpdateError {
+impl fmt::Display for PaymentError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{:?}", self)
     }
 }
 
-impl Error for UpdateError {
+impl Error for PaymentError {
     fn description(&self) -> &str {
         match self {
-            UpdateError::AccountLocked => "AccountLocked",
-            UpdateError::BadDecimal => "BadDecimal",
-            UpdateError::UnknownTxType => "UnknownTxType",
-            UpdateError::InsufficientFunds => "InsufficientFunds",
-            UpdateError::AlreadyDisputed => "AlreadyDisputed",
-            UpdateError::NotDisputed => "NotDisputed",
-            UpdateError::DuplicateTransaction => "DuplicateTransaction",
-            UpdateError::DisputedWrongClient => "DisputedWrongClient",
-            UpdateError::DisputedTxNotFound => "DisputedTxNotFound",
-            UpdateError::InvalidDisputedTxType => "InvalidDisputedTxType"
+            PaymentError::AccountLocked => "AccountLocked",
+            PaymentError::BadDecimal => "BadDecimal",
+            PaymentError::UnknownTxType => "UnknownTxType",
+            PaymentError::InsufficientFunds => "InsufficientFunds",
+            PaymentError::AlreadyDisputed => "AlreadyDisputed",
+            PaymentError::NotDisputed => "NotDisputed",
+            PaymentError::DuplicateTransaction => "DuplicateTransaction",
+            PaymentError::DisputedWrongClient => "DisputedWrongClient",
+            PaymentError::DisputedTxNotFound => "DisputedTxNotFound",
+            PaymentError::InvalidDisputedTxType => "InvalidDisputedTxType"
         }
     }
 }
 
+// i tried to use string constants but rust got all rusty on me
 /*
 #[macro_use]
 extern crate lazy_static;
@@ -54,6 +55,7 @@ lazy_static! {
 }
 */
 
+// a client transaction, deserialized from input
 #[derive(Clone, Debug, Deserialize)]
 pub struct Transaction {
     #[serde(rename = "type")]
@@ -64,12 +66,14 @@ pub struct Transaction {
     pub amount: String,
 }
 
+// metadata about all client transactions, used in disputes
 #[derive(Debug, Default)]
 pub struct Metadata {
     txs: HashMap<u32, Transaction>,
     disputes: HashSet<u32>,
 }
 
+// current state of a client account, will be serialized as output
 #[derive(Debug, Serialize)]
 pub struct Account {
     pub client: u16,
@@ -80,6 +84,7 @@ pub struct Account {
 }
 
 impl Account {
+    // ctor
     pub fn new(id: u16) -> Account {
         Account {
             client: id,
@@ -90,29 +95,24 @@ impl Account {
         }
     }
 
-    pub fn rescale(&mut self, scale: u32) {
-        self.available.rescale(scale);
-        self.held.rescale(scale);
-        self.total.rescale(scale);
-    }
-
-    pub fn update(&mut self, tx: &Transaction, meta: &mut Metadata) -> Result<(), UpdateError> {
+    // process the passed transaction for this account
+    pub fn process(&mut self, tx: &Transaction, meta: &mut Metadata) -> Result<(), PaymentError> {
         if tx.tx_type == "withdrawal" || tx.tx_type == "deposit" {
             if self.locked {
-                return Err(UpdateError::AccountLocked);
+                return Err(PaymentError::AccountLocked);
             }
 
             let amount = match Decimal::from_str(&tx.amount) {
                 Ok(amt) => amt,
-                Err(_) => return Err(UpdateError::BadDecimal)
+                Err(_) => return Err(PaymentError::BadDecimal)
             };
 
             if tx.tx_type == "withdrawal" && self.available < amount {
-                return Err(UpdateError::InsufficientFunds);
+                return Err(PaymentError::InsufficientFunds);
             }
 
             if meta.txs.contains_key(&tx.tx) {
-                return Err(UpdateError::DuplicateTransaction);
+                return Err(PaymentError::DuplicateTransaction);
             }
 
             meta.txs.insert(tx.tx, tx.clone());
@@ -127,27 +127,27 @@ impl Account {
 
         } else if tx.tx_type == "dispute" {
             if meta.disputes.contains(&tx.tx) {
-                return Err(UpdateError::AlreadyDisputed);
+                return Err(PaymentError::AlreadyDisputed);
             }
 
             let disputed_tx = match meta.txs.get(&tx.tx) {
                 Some(dtx) => dtx,
-                None => return Err(UpdateError::DisputedTxNotFound)
+                None => return Err(PaymentError::DisputedTxNotFound)
             };
 
             if disputed_tx.client != tx.client {
-                return Err(UpdateError::DisputedWrongClient);
+                return Err(PaymentError::DisputedWrongClient);
             }
             
             if disputed_tx.tx_type != "deposit" {
-                return Err(UpdateError::InvalidDisputedTxType);
+                return Err(PaymentError::InvalidDisputedTxType);
             }
             
             meta.disputes.insert(tx.tx);
             
             let amount = match Decimal::from_str(&disputed_tx.amount) {
                 Ok(amt) => amt,
-                Err(_) => return Err(UpdateError::BadDecimal)
+                Err(_) => return Err(PaymentError::BadDecimal)
             };
 
             self.available -= amount;
@@ -157,27 +157,27 @@ impl Account {
 
         } else if tx.tx_type == "resolve" || tx.tx_type == "chargeback" {
             if !meta.disputes.contains(&tx.tx) {
-                return Err(UpdateError::NotDisputed);
+                return Err(PaymentError::NotDisputed);
             }
 
             let disputed_tx = match meta.txs.get(&tx.tx) {
                 Some(dtx) => dtx,
-                None => return Err(UpdateError::DisputedTxNotFound)
+                None => return Err(PaymentError::DisputedTxNotFound)
             };
 
             if disputed_tx.client != tx.client {
-                return Err(UpdateError::DisputedWrongClient);
+                return Err(PaymentError::DisputedWrongClient);
             }
             
             if disputed_tx.tx_type != "deposit" {
-                return Err(UpdateError::InvalidDisputedTxType);
+                return Err(PaymentError::InvalidDisputedTxType);
             }
             
             meta.disputes.remove(&tx.tx);
 
             let amount = match Decimal::from_str(&disputed_tx.amount) {
                 Ok(amt) => amt,
-                Err(_) => return Err(UpdateError::BadDecimal)
+                Err(_) => return Err(PaymentError::BadDecimal)
             };
 
             if tx.tx_type == "resolve" {
@@ -191,7 +191,14 @@ impl Account {
             return Ok(());
 
         } else {
-            return Err(UpdateError::UnknownTxType);
+            return Err(PaymentError::UnknownTxType);
         }
+    }
+
+    // rescale all the decimal vars for uniform output
+    pub fn rescale(&mut self, scale: u32) {
+        self.available.rescale(scale);
+        self.held.rescale(scale);
+        self.total.rescale(scale);
     }
 }

@@ -3,9 +3,9 @@ use std::env;
 use std::error::Error;
 use std::fs::File;
 use std::io::{BufReader, stdout};
-
 use payments::{Account, Metadata, Transaction};
 
+// entrypoint
 fn main() {
     let args: Vec<String> = env::args().collect();
     let files = &args[1..]; // first arg is exe
@@ -13,23 +13,24 @@ fn main() {
     let mut metadata = Default::default();
     
     for file in files {
-        match update_accounts(file, &mut accounts, &mut metadata) {
+        match process_transactions(file, &mut accounts, &mut metadata) {
             Err(err) => eprintln!("Error reading records from {}: {}", file, err),
             Ok(()) => ()
         }
     }
 
-    let mut wtr = csv::Writer::from_writer(stdout());
+    let mut csv_writer = csv::Writer::from_writer(stdout());
 
     for account in accounts.values_mut() {
         account.rescale(4);
-        if let Err(err) = wtr.serialize(&account) {
+        if let Err(err) = csv_writer.serialize(&account) {
             eprintln!("Error writing account {}: {}", account.client, err);
         }
     }
 }
 
-fn update_accounts(path: &String, accounts: &mut HashMap<u16, Account>, meta: &mut Metadata) -> Result<(), Box<dyn Error>> {
+// process all transactions in the passed CSV file
+fn process_transactions(path: &String, accounts: &mut HashMap<u16, Account>, meta: &mut Metadata) -> Result<(), Box<dyn Error>> {
     let file = File::open(path)?;
     let buf_reader = BufReader::new(file);
 
@@ -38,8 +39,8 @@ fn update_accounts(path: &String, accounts: &mut HashMap<u16, Account>, meta: &m
         let tx: Transaction = result?;
         let account = accounts.entry(tx.client).or_insert(Account::new(tx.client));
 
-        if let Err(err) = account.update(&tx, meta) {
-            eprintln!("Error updating account {} with tx {}: {}", account.client, tx.tx, err); 
+        if let Err(err) = account.process(&tx, meta) {
+            eprintln!("Error processing tx {} for client {}: {}", tx.tx, account.client, err); 
         }
     }
 
