@@ -1,6 +1,6 @@
 use rust_decimal_macros::dec;
 
-use payments::{Account, Ledger, PaymentError, Transaction};
+use payments::{Account, Ledger, PaymentError, Transaction, DEPOSIT, WITHDRAWAL};
 
 mod helpers;
 
@@ -20,7 +20,7 @@ fn withdrawal() {
     let mut ledger = make_ledger(client, tx, dec!(100.0));
     
     let withdrawal = Transaction {
-        tx_type: "withdrawal".to_string(),
+        tx_type: WITHDRAWAL.to_string(),
         client: client,
         tx: tx+1,
         amount: "100.00".to_string(),
@@ -42,7 +42,7 @@ fn insufficient_funds() {
     let mut ledger = make_ledger(client, tx, dec!(100.0));
     
     let withdrawal = Transaction {
-        tx_type: "withdrawal".to_string(),
+        tx_type: WITHDRAWAL.to_string(),
         client: client,
         tx: tx+1,
         amount: "200.00".to_string(),
@@ -92,7 +92,7 @@ fn bad_decimal() {
     assert_eq!(ledger.accounts.len(), 0);
     
     let deposit = Transaction {
-        tx_type: "deposit".to_string(),
+        tx_type: DEPOSIT.to_string(),
         client: 0,
         tx: 0,
         amount: "ABCDE".to_string(),
@@ -114,7 +114,7 @@ fn duplicate_tx() {
     let mut ledger = make_ledger(client, tx, dec!(100.0));
 
     let withdrawal = Transaction {
-        tx_type: "withdrawal".to_string(),
+        tx_type: WITHDRAWAL.to_string(),
         client: client,
         tx: tx,
         amount: "2.00".to_string(),
@@ -141,7 +141,7 @@ fn account_locked() {
     }
 
     let withdrawal = Transaction {
-        tx_type: "withdrawal".to_string(),
+        tx_type: WITHDRAWAL.to_string(),
         client: 0,
         tx: 0,
         amount: "2.00".to_string(),

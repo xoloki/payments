@@ -1,7 +1,7 @@
 use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
 
-use payments::{Account, Ledger, Transaction};
+use payments::{Account, Ledger, Transaction, DEPOSIT, DISPUTE};
 
 // bootstrap a ledger with one client that has one deposit tx
 pub fn make_ledger(client: u16, tx: u32, amount: Decimal) -> Ledger {
@@ -10,7 +10,7 @@ pub fn make_ledger(client: u16, tx: u32, amount: Decimal) -> Ledger {
     assert_eq!(ledger.accounts.len(), 0);
     
     let deposit = Transaction {
-        tx_type: "deposit".to_string(),
+        tx_type: DEPOSIT.to_string(),
         client: client,
         tx: tx,
         amount: amount.to_string(),
@@ -33,7 +33,7 @@ pub fn make_disputed_ledger(client: u16, tx: u32, amount: Decimal) -> Ledger {
     let mut ledger = make_ledger(client, tx, amount);
 
     let dispute = Transaction {
-        tx_type: "dispute".to_string(),
+        tx_type: DISPUTE.to_string(),
         client: client,
         tx: tx,
         amount: "".to_string(),

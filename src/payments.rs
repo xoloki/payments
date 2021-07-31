@@ -42,16 +42,11 @@ impl Error for PaymentError {
     }
 }
 
-// i tried to use string constants but rust got all rusty on me
-/*
-#[macro_use]
-extern crate lazy_static;
-
-lazy_static! {
-    static ref WITHDRAWAL: String = "withdrawal".to_string();
-    static ref DEPOSIT: String = "deposit".to_string();
-}
-*/
+pub const WITHDRAWAL: &str = "withdrawal";
+pub const DEPOSIT: &str = "deposit";
+pub const DISPUTE: &str = "dispute";
+pub const RESOLVE: &str = "resolve";
+pub const CHARGEBACK: &str = "chargeback";
 
 // a client transaction, deserialized from input
 #[derive(Clone, Debug, Deserialize)]
@@ -110,7 +105,7 @@ impl Account {
 
     // process the passed transaction for this account
     pub fn process(&mut self, tx: &Transaction, global: &mut GlobalData) -> Result<(), PaymentError> {
-        if tx.tx_type == "withdrawal" || tx.tx_type == "deposit" {
+        if tx.tx_type == WITHDRAWAL.to_string() || tx.tx_type == DEPOSIT.to_string() {
             if self.locked {
                 return Err(PaymentError::AccountLocked);
             }
@@ -120,7 +115,7 @@ impl Account {
                 Err(_) => return Err(PaymentError::BadDecimal)
             };
 
-            if tx.tx_type == "withdrawal" && self.available < amount {
+            if tx.tx_type == WITHDRAWAL.to_string() && self.available < amount {
                 return Err(PaymentError::InsufficientFunds);
             }
 
@@ -130,7 +125,7 @@ impl Account {
 
             global.txs.insert(tx.tx, tx.clone());
 
-            if tx.tx_type == "withdrawal" {
+            if tx.tx_type == WITHDRAWAL.to_string() {
                 self.available -= amount;
                 self.total -= amount;
             } else {
@@ -140,7 +135,7 @@ impl Account {
             
             return Ok(());
 
-        } else if tx.tx_type == "dispute" {
+        } else if tx.tx_type == DISPUTE.to_string() {
             if global.disputes.contains(&tx.tx) {
                 return Err(PaymentError::AlreadyDisputed);
             }
@@ -166,7 +161,7 @@ impl Account {
             
             return Ok(());
 
-        } else if tx.tx_type == "resolve" || tx.tx_type == "chargeback" {
+        } else if tx.tx_type == RESOLVE.to_string() || tx.tx_type == CHARGEBACK.to_string() {
             if !global.disputes.contains(&tx.tx) {
                 return Err(PaymentError::NotDisputed);
             }
@@ -187,7 +182,7 @@ impl Account {
                 Err(_) => return Err(PaymentError::BadDecimal)
             };
 
-            if tx.tx_type == "resolve" {
+            if tx.tx_type == RESOLVE.to_string() {
                 self.available += amount;
                 self.held -= amount;
             } else {

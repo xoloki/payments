@@ -1,6 +1,6 @@
 use rust_decimal_macros::dec;
 
-use payments::{Account, PaymentError, Transaction};
+use payments::{Account, PaymentError, Transaction, WITHDRAWAL, DISPUTE, RESOLVE, CHARGEBACK};
 
 mod helpers;
 
@@ -20,7 +20,7 @@ fn resolve() {
     let mut ledger = make_disputed_ledger(client, tx, dec!(100.0));
     
     let resolve = Transaction {
-        tx_type: "resolve".to_string(),
+        tx_type: RESOLVE.to_string(),
         client: client,
         tx: tx,
         amount: "".to_string(),
@@ -43,7 +43,7 @@ fn chargeback() {
     let mut ledger = make_disputed_ledger(client, tx, dec!(100.0));
     
     let chargeback = Transaction {
-        tx_type: "chargeback".to_string(),
+        tx_type: CHARGEBACK.to_string(),
         client: client,
         tx: tx,
         amount: "".to_string(),
@@ -66,7 +66,7 @@ fn already_disputed() {
     let mut ledger = make_disputed_ledger(client, tx, dec!(100.0));
     
     let dispute = Transaction {
-        tx_type: "dispute".to_string(),
+        tx_type: DISPUTE.to_string(),
         client: client,
         tx: tx,
         amount: "".to_string(),
@@ -93,7 +93,7 @@ fn not_disputed() {
     let mut ledger = make_disputed_ledger(client, tx, dec!(100.0));
     
     let resolve = Transaction {
-        tx_type: "resolve".to_string(),
+        tx_type: RESOLVE.to_string(),
         client: client,
         tx: tx,
         amount: "".to_string(),
@@ -135,7 +135,7 @@ fn disputed_wrong_client() {
     assert_eq!(ledger.accounts.len(), 2);
 
     let dispute = Transaction {
-        tx_type: "dispute".to_string(),
+        tx_type: DISPUTE.to_string(),
         client: client+1,
         tx: tx,
         amount: "".to_string(),
@@ -157,7 +157,7 @@ fn disputed_tx_not_found() {
     let mut ledger = make_ledger(client, tx, dec!(100.0));
     
     let dispute = Transaction {
-        tx_type: "dispute".to_string(),
+        tx_type: DISPUTE.to_string(),
         client: client,
         tx: tx+1,
         amount: "".to_string(),
@@ -179,7 +179,7 @@ fn chargeback_withdrawal() {
     let mut ledger = make_ledger(client, tx, dec!(100.0));
     
     let withdrawal = Transaction {
-        tx_type: "withdrawal".to_string(),
+        tx_type: WITHDRAWAL.to_string(),
         client: client,
         tx: tx+1,
         amount: "50.00".to_string(),
@@ -188,7 +188,7 @@ fn chargeback_withdrawal() {
     ledger.process(&withdrawal).expect("Failed to process withdrawal");
 
     let dispute = Transaction {
-        tx_type: "dispute".to_string(),
+        tx_type: DISPUTE.to_string(),
         client: client,
         tx: tx+1,
         amount: "".to_string(),
@@ -197,7 +197,7 @@ fn chargeback_withdrawal() {
     ledger.process(&dispute).expect("Failed to dispute withdrawal");
 
     let chargeback = Transaction {
-        tx_type: "chargeback".to_string(),
+        tx_type: CHARGEBACK.to_string(),
         client: client,
         tx: tx+1,
         amount: "".to_string(),
