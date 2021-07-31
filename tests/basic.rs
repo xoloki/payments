@@ -32,6 +32,7 @@ fn withdrawal() {
 
     let account: &Account = ledger.accounts.get(&client).expect("Failed to get account for client");
     assert_eq!(account.available, dec!(0.0));
+    assert_eq!(account.total, dec!(0.0));
 }
 
 #[test]
@@ -58,6 +59,7 @@ fn insufficient_funds() {
     {
         let account: &Account = ledger.accounts.get(&client).expect("Failed to get account for client 0");
         assert_eq!(account.available, dec!(100.0));
+        assert_eq!(account.total, dec!(100.0));
     }
 }
 

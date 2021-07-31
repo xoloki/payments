@@ -23,6 +23,7 @@ pub fn make_ledger(client: u16, tx: u32, amount: Decimal) -> Ledger {
     let account: &Account = ledger.accounts.get(&client).expect("Failed to get account for client");
 
     assert_eq!(account.available, amount);
+    assert_eq!(account.total, amount);
 
     ledger
 }
@@ -45,6 +46,7 @@ pub fn make_disputed_ledger(client: u16, tx: u32, amount: Decimal) -> Ledger {
     let account: &Account = ledger.accounts.get(&client).expect("Failed to get account for client");
     assert_eq!(account.available, dec!(0.0));
     assert_eq!(account.held, amount);
+    assert_eq!(account.total, amount);
     
     ledger
 }

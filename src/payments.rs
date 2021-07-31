@@ -18,7 +18,6 @@ pub enum PaymentError {
     NotDisputed,
     DisputedWrongClient,
     DisputedTxNotFound,
-    InvalidDisputedTxType,
 }
 
 impl fmt::Display for PaymentError {
@@ -39,7 +38,6 @@ impl Error for PaymentError {
             PaymentError::DuplicateTransaction => "DuplicateTransaction",
             PaymentError::DisputedWrongClient => "DisputedWrongClient",
             PaymentError::DisputedTxNotFound => "DisputedTxNotFound",
-            PaymentError::InvalidDisputedTxType => "InvalidDisputedTxType"
         }
     }
 }
@@ -134,8 +132,10 @@ impl Account {
 
             if tx.tx_type == "withdrawal" {
                 self.available -= amount;
+                self.total -= amount;
             } else {
                 self.available += amount;
+                self.total += amount;
             }
             
             return Ok(());
@@ -152,10 +152,6 @@ impl Account {
 
             if disputed_tx.client != tx.client {
                 return Err(PaymentError::DisputedWrongClient);
-            }
-            
-            if disputed_tx.tx_type != "deposit" {
-                return Err(PaymentError::InvalidDisputedTxType);
             }
             
             global.disputes.insert(tx.tx);
@@ -184,10 +180,6 @@ impl Account {
                 return Err(PaymentError::DisputedWrongClient);
             }
             
-            if disputed_tx.tx_type != "deposit" {
-                return Err(PaymentError::InvalidDisputedTxType);
-            }
-            
             global.disputes.remove(&tx.tx);
 
             let amount = match Decimal::from_str(&disputed_tx.amount) {
@@ -200,6 +192,7 @@ impl Account {
                 self.held -= amount;
             } else {
                 self.held -= amount;
+                self.total -= amount;
                 self.locked = true;
             }
             

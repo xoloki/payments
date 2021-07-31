@@ -33,6 +33,30 @@ fn resolve() {
     let account: &Account = ledger.accounts.get(&client).expect("Failed to get account for client");
     assert_eq!(account.available, dec!(100.0));
     assert_eq!(account.held, dec!(0.0));
+    assert_eq!(account.total, dec!(100.0));
+}
+
+#[test]
+fn chargeback() {
+    let client: u16 = 0;
+    let tx: u32 = 0;
+    let mut ledger = make_disputed_ledger(client, tx, dec!(100.0));
+    
+    let chargeback = Transaction {
+        tx_type: "chargeback".to_string(),
+        client: client,
+        tx: tx,
+        amount: "".to_string(),
+    };
+
+    ledger.process(&chargeback).expect("Failed to process chargeback");
+
+    assert_eq!(ledger.accounts.len(), 1);
+
+    let account: &Account = ledger.accounts.get(&client).expect("Failed to get account for client");
+    assert_eq!(account.available, dec!(0.0));
+    assert_eq!(account.held, dec!(0.0));
+    assert_eq!(account.total, dec!(0.0));
 }
 
 #[test]
@@ -149,7 +173,7 @@ fn disputed_tx_not_found() {
 }
 
 #[test]
-fn invalid_disputed_tx_type() {
+fn chargeback_withdrawal() {
     let client: u16 = 0;
     let tx: u32 = 0;
     let mut ledger = make_ledger(client, tx, dec!(100.0));
@@ -158,7 +182,7 @@ fn invalid_disputed_tx_type() {
         tx_type: "withdrawal".to_string(),
         client: client,
         tx: tx+1,
-        amount: "100.00".to_string(),
+        amount: "50.00".to_string(),
     };
 
     ledger.process(&withdrawal).expect("Failed to process withdrawal");
@@ -170,12 +194,23 @@ fn invalid_disputed_tx_type() {
         amount: "".to_string(),
     };
 
-    match ledger.process(&dispute) {
-        Ok(()) => assert!(false, "InvalidDisputedTxType succeeded"),
-        Err(err) => match err {
-            PaymentError::InvalidDisputedTxType => (),
-            _ => assert!(false, "InvalidDisputedTxType failed with wrong error"),
-        }
+    ledger.process(&dispute).expect("Failed to dispute withdrawal");
+
+    let chargeback = Transaction {
+        tx_type: "chargeback".to_string(),
+        client: client,
+        tx: tx+1,
+        amount: "".to_string(),
+    };
+
+    ledger.process(&chargeback).expect("Failed to chargeback withdrawal");
+
+    {
+        let account: &Account = ledger.accounts.get(&client).expect("Failed to get account for client");
+        assert_eq!(account.available, dec!(0.0));
+        assert_eq!(account.held, dec!(0.0));
+        assert_eq!(account.total, dec!(0.0));
+        assert_eq!(account.locked, true);
     }
 }
 
