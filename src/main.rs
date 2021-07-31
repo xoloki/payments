@@ -1,7 +1,7 @@
 use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
 use serde::{Serialize, Deserialize};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::env;
 use std::error::Error;
 use std::fmt;
@@ -19,9 +19,14 @@ lazy_static! {
 */
 #[derive(Debug)]
 pub enum UpdateError {
-    BadTxType,
+    UnknownTxType,
     InsufficientFunds,
     DuplicateTransaction,
+    AlreadyDisputed,
+    NotDisputed,
+    DisputedWrongClient,
+    DisputedTxNotFound,
+    InvalidDisputedTxType,
 }
 
 impl fmt::Display for UpdateError {
@@ -33,9 +38,14 @@ impl fmt::Display for UpdateError {
 impl Error for UpdateError {
     fn description(&self) -> &str {
         match self {
-            UpdateError::BadTxType => "BadTxType",
+            UpdateError::UnknownTxType => "UnknownTxType",
             UpdateError::InsufficientFunds => "InsufficientFunds",
-            UpdateError::DuplicateTransaction => "DuplicateTransaction"
+            UpdateError::AlreadyDisputed => "AlreadyDisputed",
+            UpdateError::NotDisputed => "NotDisputed",
+            UpdateError::DuplicateTransaction => "DuplicateTransaction",
+            UpdateError::DisputedWrongClient => "DisputedWrongClient",
+            UpdateError::DisputedTxNotFound => "DisputedTxNotFound",
+            UpdateError::InvalidDisputedTxType => "InvalidDisputedTxType"
         }
     }
 }
@@ -75,7 +85,7 @@ impl Account {
         self.total.rescale(scale);
     }
 
-    pub fn update(&mut self, tx: &Transaction, txs: &mut HashMap<u32, Transaction>) -> Result<(), UpdateError> {
+    pub fn update(&mut self, tx: &Transaction, txs: &mut HashMap<u32, Transaction>, disputes: &mut HashSet<u32>) -> Result<(), UpdateError> {
         if tx.tx_type == "withdrawal" {
             if self.available < tx.amount {
                 return Err(UpdateError::InsufficientFunds);
@@ -100,8 +110,83 @@ impl Account {
             
             return Ok(());
 
+        } else if tx.tx_type == "dispute" {
+            if disputes.contains(&tx.tx) {
+                return Err(UpdateError::AlreadyDisputed);
+            }
+
+            let disputed_tx = match txs.get(&tx.tx) {
+                Some(dtx) => dtx,
+                None => return Err(UpdateError::DisputedTxNotFound)
+            };
+
+            if disputed_tx.client != tx.client {
+                return Err(UpdateError::DisputedWrongClient);
+            }
+            
+            if disputed_tx.tx_type != "deposit" {
+                return Err(UpdateError::InvalidDisputedTxType);
+            }
+            
+            disputes.insert(tx.tx);
+            
+            self.available -= tx.amount;
+            self.held += tx.amount;
+            
+            return Ok(());
+
+        } else if tx.tx_type == "resolve" {
+            if !disputes.contains(&tx.tx) {
+                return Err(UpdateError::NotDisputed);
+            }
+
+            let disputed_tx = match txs.get(&tx.tx) {
+                Some(dtx) => dtx,
+                None => return Err(UpdateError::DisputedTxNotFound)
+            };
+
+            if disputed_tx.client != tx.client {
+                return Err(UpdateError::DisputedWrongClient);
+            }
+            
+            if disputed_tx.tx_type != "deposit" {
+                return Err(UpdateError::InvalidDisputedTxType);
+            }
+            
+            disputes.remove(&tx.tx);
+            
+            self.available += tx.amount;
+            self.held -= tx.amount;
+            
+            return Ok(());
+
+        } else if tx.tx_type == "chargeback" {
+            if !disputes.contains(&tx.tx) {
+                return Err(UpdateError::NotDisputed);
+            }
+
+            let disputed_tx = match txs.get(&tx.tx) {
+                Some(dtx) => dtx,
+                None => return Err(UpdateError::DisputedTxNotFound)
+            };
+
+            if disputed_tx.client != tx.client {
+                return Err(UpdateError::DisputedWrongClient);
+            }
+            
+            if disputed_tx.tx_type != "deposit" {
+                return Err(UpdateError::InvalidDisputedTxType);
+            }
+            
+            disputes.remove(&tx.tx);
+            
+            self.held -= tx.amount;
+            self.locked = true;
+            
+            return Ok(());
+
         } else {
-            return Err(UpdateError::BadTxType);
+            return Err(UpdateError::UnknownTxType);
         }
     }
 }
@@ -111,9 +196,10 @@ fn main() {
     let files = &args[1..]; // first arg is exe
     let mut accounts = HashMap::new();
     let mut txs = HashMap::new();
+    let mut disputes = HashSet::new();
     
     for file in files {
-        match update_accounts(file, &mut accounts, &mut txs) {
+        match update_accounts(file, &mut accounts, &mut txs, &mut disputes) {
             Err(err) => eprintln!("Error reading records from {}: {}", file, err),
             Ok(()) => ()
         }
@@ -129,7 +215,7 @@ fn main() {
     }
 }
 
-fn update_accounts(path: &String, accounts: &mut HashMap<u16, Account>, txs: &mut HashMap<u32, Transaction>) -> Result<(), Box<dyn Error>> {
+fn update_accounts(path: &String, accounts: &mut HashMap<u16, Account>, txs: &mut HashMap<u32, Transaction>, disputes: &mut HashSet<u32>) -> Result<(), Box<dyn Error>> {
     let file = File::open(path)?;
     let buf_reader = BufReader::new(file);
 
@@ -138,7 +224,7 @@ fn update_accounts(path: &String, accounts: &mut HashMap<u16, Account>, txs: &mu
         let tx: Transaction = result?;
         let account = accounts.entry(tx.client).or_insert(Account::new(tx.client));
 
-        if let Err(err) = account.update(&tx, txs) {
+        if let Err(err) = account.update(&tx, txs, disputes) {
             eprintln!("Error updating account {} with tx {}: {}", account.client, tx.tx, err); 
 
         }
