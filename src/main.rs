@@ -92,7 +92,7 @@ impl Account {
     }
 
     pub fn update(&mut self, tx: &Transaction, txs: &mut HashMap<u32, Transaction>, disputes: &mut HashSet<u32>) -> Result<(), UpdateError> {
-        if tx.tx_type == "withdrawal" {
+        if tx.tx_type == "withdrawal" || tx.tx_type == "deposit" {
             if self.locked {
                 return Err(UpdateError::AccountLocked);
             }
@@ -102,35 +102,21 @@ impl Account {
                 Err(_) => return Err(UpdateError::BadDecimal)
             };
 
-            if self.available < amount {
+            if tx.tx_type == "withdrawal" && self.available < amount {
                 return Err(UpdateError::InsufficientFunds);
             }
 
             if txs.contains_key(&tx.tx) {
                 return Err(UpdateError::DuplicateTransaction);
             }
-            
+
             txs.insert(tx.tx, tx.clone());
-            self.available -= amount;
-            
-            return Ok(());
 
-        } else if tx.tx_type == "deposit" {
-            if self.locked {
-                return Err(UpdateError::AccountLocked);
+            if tx.tx_type == "withdrawal" {
+                self.available -= amount;
+            } else {
+                self.available += amount;
             }
-
-            let amount = match Decimal::from_str(&tx.amount) {
-                Ok(amt) => amt,
-                Err(_) => return Err(UpdateError::BadDecimal)
-            };
-
-            if txs.contains_key(&tx.tx) {
-                return Err(UpdateError::DuplicateTransaction);
-            }
-            
-            txs.insert(tx.tx, tx.clone());
-            self.available += amount;
             
             return Ok(());
 
