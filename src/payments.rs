@@ -66,13 +66,6 @@ pub struct Transaction {
     pub amount: String,
 }
 
-// metadata about all client transactions, used in disputes
-#[derive(Debug, Default)]
-pub struct Metadata {
-    txs: HashMap<u32, Transaction>,
-    disputes: HashSet<u32>,
-}
-
 // current state of a client account, will be serialized as output
 #[derive(Debug, Serialize)]
 pub struct Account {
@@ -81,6 +74,28 @@ pub struct Account {
     pub held: Decimal,
     pub total: Decimal,
     pub locked: bool,
+}
+
+// global data for all transactions/disputes
+#[derive(Debug, Default)]
+pub struct GlobalData {
+    txs: HashMap<u32, Transaction>,
+    disputes: HashSet<u32>,
+}
+
+// ledger containing all client accounts
+#[derive(Debug, Default)]
+pub struct Ledger {
+    pub accounts: HashMap<u16, Account>,
+    global: GlobalData,
+}
+
+impl Ledger {
+    pub fn process(&mut self, tx: &Transaction) -> Result<(), PaymentError> {
+        let account = self.accounts.entry(tx.client).or_insert(Account::new(tx.client));
+
+        account.process(&tx, &mut self.global)
+    }
 }
 
 impl Account {
@@ -96,7 +111,7 @@ impl Account {
     }
 
     // process the passed transaction for this account
-    pub fn process(&mut self, tx: &Transaction, meta: &mut Metadata) -> Result<(), PaymentError> {
+    pub fn process(&mut self, tx: &Transaction, global: &mut GlobalData) -> Result<(), PaymentError> {
         if tx.tx_type == "withdrawal" || tx.tx_type == "deposit" {
             if self.locked {
                 return Err(PaymentError::AccountLocked);
@@ -111,11 +126,11 @@ impl Account {
                 return Err(PaymentError::InsufficientFunds);
             }
 
-            if meta.txs.contains_key(&tx.tx) {
+            if global.txs.contains_key(&tx.tx) {
                 return Err(PaymentError::DuplicateTransaction);
             }
 
-            meta.txs.insert(tx.tx, tx.clone());
+            global.txs.insert(tx.tx, tx.clone());
 
             if tx.tx_type == "withdrawal" {
                 self.available -= amount;
@@ -126,11 +141,11 @@ impl Account {
             return Ok(());
 
         } else if tx.tx_type == "dispute" {
-            if meta.disputes.contains(&tx.tx) {
+            if global.disputes.contains(&tx.tx) {
                 return Err(PaymentError::AlreadyDisputed);
             }
 
-            let disputed_tx = match meta.txs.get(&tx.tx) {
+            let disputed_tx = match global.txs.get(&tx.tx) {
                 Some(dtx) => dtx,
                 None => return Err(PaymentError::DisputedTxNotFound)
             };
@@ -143,7 +158,7 @@ impl Account {
                 return Err(PaymentError::InvalidDisputedTxType);
             }
             
-            meta.disputes.insert(tx.tx);
+            global.disputes.insert(tx.tx);
             
             let amount = match Decimal::from_str(&disputed_tx.amount) {
                 Ok(amt) => amt,
@@ -156,11 +171,11 @@ impl Account {
             return Ok(());
 
         } else if tx.tx_type == "resolve" || tx.tx_type == "chargeback" {
-            if !meta.disputes.contains(&tx.tx) {
+            if !global.disputes.contains(&tx.tx) {
                 return Err(PaymentError::NotDisputed);
             }
 
-            let disputed_tx = match meta.txs.get(&tx.tx) {
+            let disputed_tx = match global.txs.get(&tx.tx) {
                 Some(dtx) => dtx,
                 None => return Err(PaymentError::DisputedTxNotFound)
             };
@@ -173,7 +188,7 @@ impl Account {
                 return Err(PaymentError::InvalidDisputedTxType);
             }
             
-            meta.disputes.remove(&tx.tx);
+            global.disputes.remove(&tx.tx);
 
             let amount = match Decimal::from_str(&disputed_tx.amount) {
                 Ok(amt) => amt,

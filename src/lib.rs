@@ -1,3 +1,3 @@
 mod payments;
 
-pub use self::payments::{Account, Metadata, Transaction, PaymentError};
+pub use self::payments::{Account, Ledger, Transaction, PaymentError};
