@@ -11,7 +11,10 @@ cargo run -- input.csv > output.csv
 To test a larger dataset, first create it, then run:
 
 ```
-echo "type,client,tx,amount" > input_large.csv; for (( i=0; i<1000000; i++ )); do echo "deposit,1,$i,1.0" >> input_large.csv; done
+echo "type,client,tx,amount" > input_large.csv
+for (( i=0; i<1000000; i++ )); do
+    echo "deposit,1,$i,1.0" >> input_large.csv;
+done
 cargo run -- input_large.csv > output_large.csv
 ```
 
