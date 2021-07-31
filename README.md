@@ -2,7 +2,7 @@
 A simple toy payments engine that reads a series of transactions from a CSV, updates client accounts, handles disputes and chargebacks, and then outputs the state of clients accounts as a CSV.
 
 ## Notes
-I only implemented disputes for deposit transactions.  Disputing withdrawals doesn't seem to follow the same semantics.
+I originally only implemented disputes for deposit transactions.  Disputing withdrawals didn't seem to follow the same semantics.  But on further reflection, in the case where someone deposits, withdraws the deposit, then disputes the deposit, it will be necessary to then chargeback the withdrawal.  This should have the same semantics as a deposit dispute.
 
 ## Testing
 You can test with the provided input.csv to verify that basic operations complete, and also trigger all errors:
