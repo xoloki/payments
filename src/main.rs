@@ -1,22 +1,21 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::env;
 use std::error::Error;
 use std::fs::File;
 use std::io::{BufReader, stdout};
 
-mod account;
+mod payments;
 
-use account::{Account, Transaction};
+use payments::{Account, Metadata, Transaction};
 
 fn main() {
     let args: Vec<String> = env::args().collect();
     let files = &args[1..]; // first arg is exe
     let mut accounts = HashMap::new();
-    let mut txs = HashMap::new();
-    let mut disputes = HashSet::new();
+    let mut metadata = Default::default();
     
     for file in files {
-        match update_accounts(file, &mut accounts, &mut txs, &mut disputes) {
+        match update_accounts(file, &mut accounts, &mut metadata) {
             Err(err) => eprintln!("Error reading records from {}: {}", file, err),
             Ok(()) => ()
         }
@@ -32,7 +31,7 @@ fn main() {
     }
 }
 
-fn update_accounts(path: &String, accounts: &mut HashMap<u16, Account>, txs: &mut HashMap<u32, Transaction>, disputes: &mut HashSet<u32>) -> Result<(), Box<dyn Error>> {
+fn update_accounts(path: &String, accounts: &mut HashMap<u16, Account>, meta: &mut Metadata) -> Result<(), Box<dyn Error>> {
     let file = File::open(path)?;
     let buf_reader = BufReader::new(file);
 
@@ -41,9 +40,8 @@ fn update_accounts(path: &String, accounts: &mut HashMap<u16, Account>, txs: &mu
         let tx: Transaction = result?;
         let account = accounts.entry(tx.client).or_insert(Account::new(tx.client));
 
-        if let Err(err) = account.update(&tx, txs, disputes) {
+        if let Err(err) = account.update(&tx, meta) {
             eprintln!("Error updating account {} with tx {}: {}", account.client, tx.tx, err); 
-
         }
     }
 

@@ -6,6 +6,7 @@ use std::error::Error;
 use std::fmt;
 use std::str::FromStr;
 
+// the set of errors which can happen durin
 #[derive(Debug)]
 pub enum UpdateError {
     AccountLocked,
@@ -63,6 +64,12 @@ pub struct Transaction {
     pub amount: String,
 }
 
+#[derive(Debug, Default)]
+pub struct Metadata {
+    txs: HashMap<u32, Transaction>,
+    disputes: HashSet<u32>,
+}
+
 #[derive(Debug, Serialize)]
 pub struct Account {
     pub client: u16,
@@ -89,7 +96,7 @@ impl Account {
         self.total.rescale(scale);
     }
 
-    pub fn update(&mut self, tx: &Transaction, txs: &mut HashMap<u32, Transaction>, disputes: &mut HashSet<u32>) -> Result<(), UpdateError> {
+    pub fn update(&mut self, tx: &Transaction, meta: &mut Metadata) -> Result<(), UpdateError> {
         if tx.tx_type == "withdrawal" || tx.tx_type == "deposit" {
             if self.locked {
                 return Err(UpdateError::AccountLocked);
@@ -104,11 +111,11 @@ impl Account {
                 return Err(UpdateError::InsufficientFunds);
             }
 
-            if txs.contains_key(&tx.tx) {
+            if meta.txs.contains_key(&tx.tx) {
                 return Err(UpdateError::DuplicateTransaction);
             }
 
-            txs.insert(tx.tx, tx.clone());
+            meta.txs.insert(tx.tx, tx.clone());
 
             if tx.tx_type == "withdrawal" {
                 self.available -= amount;
@@ -119,11 +126,11 @@ impl Account {
             return Ok(());
 
         } else if tx.tx_type == "dispute" {
-            if disputes.contains(&tx.tx) {
+            if meta.disputes.contains(&tx.tx) {
                 return Err(UpdateError::AlreadyDisputed);
             }
 
-            let disputed_tx = match txs.get(&tx.tx) {
+            let disputed_tx = match meta.txs.get(&tx.tx) {
                 Some(dtx) => dtx,
                 None => return Err(UpdateError::DisputedTxNotFound)
             };
@@ -136,7 +143,7 @@ impl Account {
                 return Err(UpdateError::InvalidDisputedTxType);
             }
             
-            disputes.insert(tx.tx);
+            meta.disputes.insert(tx.tx);
             
             let amount = match Decimal::from_str(&disputed_tx.amount) {
                 Ok(amt) => amt,
@@ -149,11 +156,11 @@ impl Account {
             return Ok(());
 
         } else if tx.tx_type == "resolve" || tx.tx_type == "chargeback" {
-            if !disputes.contains(&tx.tx) {
+            if !meta.disputes.contains(&tx.tx) {
                 return Err(UpdateError::NotDisputed);
             }
 
-            let disputed_tx = match txs.get(&tx.tx) {
+            let disputed_tx = match meta.txs.get(&tx.tx) {
                 Some(dtx) => dtx,
                 None => return Err(UpdateError::DisputedTxNotFound)
             };
@@ -166,7 +173,7 @@ impl Account {
                 return Err(UpdateError::InvalidDisputedTxType);
             }
             
-            disputes.remove(&tx.tx);
+            meta.disputes.remove(&tx.tx);
 
             let amount = match Decimal::from_str(&disputed_tx.amount) {
                 Ok(amt) => amt,
@@ -188,4 +195,3 @@ impl Account {
         }
     }
 }
-
