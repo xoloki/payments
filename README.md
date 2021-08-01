@@ -7,7 +7,13 @@ A simple toy payments engine that reads a series of transactions from a CSV, upd
 The spec doc I was working from used both ```"withdraw"``` and ```"withdrawal"``` to refer to that tx type, the latter in the example data and the former when detailing the fields of the tx types.  The code provides a ```pub const WITHDRAWAL: &str = "..."``` at the top of ```src/payments.rs```.  If you wish to change the string just change it there, and everything should work as expected.
 
 ### Disputes
-I originally only implemented disputes for deposit transactions.  Disputing withdrawals didn't seem to follow the same semantics.  But on further reflection, in the case where someone deposits, withdraws the deposit, then disputes the deposit, it will be necessary to then chargeback the withdrawal.  This should have the same semantics as a deposit dispute.
+The spec doc was also ambiguous in regards to disputes.  The description of how a dispute should be handled in terms of the ```Account``` balances seemed to only apply to deposits, not withdrawals.  So I originally only implemented disputes for deposit transactions.
+
+But in order to implement the spec fully, I eventually allows withdrawals to also be disputed, using the same semantics as deposit: subtract the disputed amount from ```available```, and put it in ```held```; resolve moves back to ```available```, while chargebacks take the ```held``` amount.
+
+This seems wrong, as the following example will illustrate.  Say a client deposits ```100.00```, then withdraws ```50.00```.  This will result in an ```available``` balance of ```50.00```.  If the withdrawal is disputed, then by the above algorithm we would move the remaining ```50.00``` to ```held```.  If the dispute is resolved, then everything works correctly.  But if the resolution is ```chargeback```, then the client ends up with ```0.00``` total, which seems wrong.  At most the client scammed the payment service for ```50.00```, and so should still have that much.
+
+This is not, however, considering what happened to the withdrawn funds.  If the payment engine chargeback actually reversed the withdrawal *externally*, then the withdrawn funds would go back into the ```Account```.
 
 ### Amounts
 Most places in the code use ```rust_decimal::Decimal``` to represent amounts.  But for ```struct Transaction``` I used ```String```.  This was because the various dispute transaction types have an empty string for the amount, and ```rust_decimal::Decimal``` really didn't want to parse it.
