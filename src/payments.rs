@@ -107,7 +107,7 @@ impl Account {
 
     // process the passed transaction for this account
     pub fn process(&mut self, tx: &Transaction, global: &mut GlobalData) -> Result<(), PaymentError> {
-        if tx.tx_type == WITHDRAWAL.to_string() || tx.tx_type == DEPOSIT.to_string() {
+        if tx.tx_type == WITHDRAWAL || tx.tx_type == DEPOSIT {
             if self.locked {
                 return Err(PaymentError::AccountLocked);
             }
@@ -117,7 +117,7 @@ impl Account {
                 Err(_) => return Err(PaymentError::BadDecimal)
             };
 
-            if tx.tx_type == WITHDRAWAL.to_string() && self.available < amount {
+            if tx.tx_type == WITHDRAWAL && self.available < amount {
                 return Err(PaymentError::InsufficientFunds);
             }
 
@@ -127,7 +127,7 @@ impl Account {
 
             global.txs.insert(tx.tx, tx.clone());
 
-            if tx.tx_type == WITHDRAWAL.to_string() {
+            if tx.tx_type == WITHDRAWAL {
                 self.available -= amount;
                 self.total -= amount;
             } else {
@@ -137,7 +137,7 @@ impl Account {
             
             return Ok(());
 
-        } else if tx.tx_type == DISPUTE.to_string() {
+        } else if tx.tx_type == DISPUTE {
             if global.disputes.contains(&tx.tx) {
                 return Err(PaymentError::AlreadyDisputed);
             }
@@ -163,7 +163,7 @@ impl Account {
             
             return Ok(());
 
-        } else if tx.tx_type == RESOLVE.to_string() || tx.tx_type == CHARGEBACK.to_string() {
+        } else if tx.tx_type == RESOLVE || tx.tx_type == CHARGEBACK {
             if !global.disputes.contains(&tx.tx) {
                 return Err(PaymentError::NotDisputed);
             }
@@ -184,7 +184,7 @@ impl Account {
                 Err(_) => return Err(PaymentError::BadDecimal)
             };
 
-            if tx.tx_type == RESOLVE.to_string() {
+            if tx.tx_type == RESOLVE {
                 self.available += amount;
                 self.held -= amount;
             } else {
