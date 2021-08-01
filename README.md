@@ -15,7 +15,9 @@ Most places in the code use ```rust_decimal::Decimal``` to represent amounts.  B
 Since I'm layering ```rust_decimal``` on top of ```serde``` on top of ```csv```, it didn't seem worth it to try getting ```Decimal``` to behave properly.
 
 ## Testing
-You can test with the provided input.csv to verify that basic operations complete, and also trigger all errors:
+I provided a complete set of unit tests, which can be run by invoking ```cargo test```.  This tests the library code, but not the main entrypoint.
+
+You can test that with the provided input.csv to verify that basic operations complete, and also trigger all errors:
 
 ```
 cargo run -- input.csv > output.csv
@@ -32,9 +34,3 @@ cargo run -- input_large.csv > output_large.csv
 ```
 
 On my machine, it takes about 8 seconds to create the dataset, and 11 seconds to process it.  Processing only needs a small amount of memory since the data is streamed.
-
-You can also run unit tests:
-
-```
-cargo test
-```
