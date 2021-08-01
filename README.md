@@ -2,8 +2,14 @@
 A simple toy payments engine that reads a series of transactions from a CSV, updates client accounts, handles disputes and chargebacks, and then outputs the state of clients accounts as a CSV.
 
 ## Notes
+
+### Withdrawal Transaction Type
+The spec doc I was working from used both ```"withdraw"``` and ```"withdrawal"``` to refer to that tx type, the latter in the example data and the former when detailing the fields of the tx types.  The code provides a ```pub const WITHDRAWAL: &str = "..."``` at the top of ```src/payments.rs```.  If you wish to change the string just change it there, and everything should work as expected.
+
+### Disputes
 I originally only implemented disputes for deposit transactions.  Disputing withdrawals didn't seem to follow the same semantics.  But on further reflection, in the case where someone deposits, withdraws the deposit, then disputes the deposit, it will be necessary to then chargeback the withdrawal.  This should have the same semantics as a deposit dispute.
 
+### Amounts
 Most places in the code use ```rust_decimal::Decimal``` to represent amounts.  But for ```struct Transaction``` I used ```String```.  This was because the various dispute transaction types have an empty string for the amount, and ```rust_decimal::Decimal``` really didn't want to parse it.
 
 Since I'm layering ```rust_decimal``` on top of ```serde``` on top of ```csv```, it didn't seem worth it to try getting ```Decimal``` to behave properly.
