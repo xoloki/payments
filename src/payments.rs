@@ -6,6 +6,13 @@ use std::error::Error;
 use std::fmt;
 use std::str::FromStr;
 
+// string constants for tx type
+pub const WITHDRAWAL: &str = "withdrawal";
+pub const DEPOSIT: &str = "deposit";
+pub const DISPUTE: &str = "dispute";
+pub const RESOLVE: &str = "resolve";
+pub const CHARGEBACK: &str = "chargeback";
+
 // the set of errors which can happen during
 #[derive(Debug)]
 pub enum PaymentError {
@@ -41,12 +48,6 @@ impl Error for PaymentError {
         }
     }
 }
-
-pub const WITHDRAWAL: &str = "withdrawal";
-pub const DEPOSIT: &str = "deposit";
-pub const DISPUTE: &str = "dispute";
-pub const RESOLVE: &str = "resolve";
-pub const CHARGEBACK: &str = "chargeback";
 
 // a client transaction, deserialized from input
 #[derive(Clone, Debug, Deserialize)]
@@ -84,6 +85,7 @@ pub struct Ledger {
 }
 
 impl Ledger {
+    // find the linked client account and process the passed transaction
     pub fn process(&mut self, tx: &Transaction) -> Result<(), PaymentError> {
         let account = self.accounts.entry(tx.client).or_insert(Account::new(tx.client));
 

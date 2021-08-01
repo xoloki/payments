@@ -4,6 +4,10 @@ A simple toy payments engine that reads a series of transactions from a CSV, upd
 ## Notes
 I originally only implemented disputes for deposit transactions.  Disputing withdrawals didn't seem to follow the same semantics.  But on further reflection, in the case where someone deposits, withdraws the deposit, then disputes the deposit, it will be necessary to then chargeback the withdrawal.  This should have the same semantics as a deposit dispute.
 
+Most places in the code use ```rust_decimal::Decimal``` to represent amounts.  But for ```struct Transaction``` I used ```String```.  This was because the various dispute transaction types have an empty string for the amount, and ```rust_decimal::Decimal``` really didn't want to parse it.
+
+Since I'm layering ```rust_decimal``` on top of ```serde``` on top of ```csv```, it didn't seem worth it to try getting ```Decimal``` to behave properly.
+
 ## Testing
 You can test with the provided input.csv to verify that basic operations complete, and also trigger all errors:
 
