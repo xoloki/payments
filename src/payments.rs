@@ -157,9 +157,13 @@ impl Account {
                 Ok(amt) => amt,
                 Err(_) => return Err(PaymentError::BadDecimal)
             };
-
-            self.available -= amount;
-            self.held += amount;
+ 
+            if disputed_tx.tx_type == DEPOSIT {
+                self.available -= amount;
+                self.held += amount;
+            } else { // WITHDRAWAL
+                self.locked = true;
+            }
             
             return Ok(());
 
@@ -185,25 +189,20 @@ impl Account {
             };
 
             if tx.tx_type == RESOLVE {
-                self.available += amount;
-                self.held -= amount;
-            } else { // CHARGEBACK
-                // always lock and remove the hold
-                self.locked = true;
-                self.held -= amount;
-                
                 if disputed_tx.tx_type == DEPOSIT {
-                    // returned deposits reduce the total funds
+                    self.available += amount;
+                    self.held -= amount;
+                } else { // WITHDRAWAL
+                    self.locked = false;
+                }
+            } else { // CHARGEBACK
+                if disputed_tx.tx_type == DEPOSIT {
+                    self.held -= amount;
                     self.total -= amount;
-                } else { //WITHDRAWAL
-                    // move the held back into available
-                    self.available += amount;
-
-                    // the chargeback itself also adds to the account
-                    self.available += amount;
-
-                    // returned withdrawals increase the total funds
-                    self.total += amount;
+                    self.locked = true;
+                } else { // WITHDRAWAL
+                    // should already be locked
+                    self.locked = true;
                 }
             }
             

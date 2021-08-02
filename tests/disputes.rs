@@ -198,10 +198,10 @@ fn dispute_withdrawal() {
 
     {
         let account: &Account = ledger.accounts.get(&client).expect("Failed to get account for client");
-        assert_eq!(account.available, dec!(00.0));
-        assert_eq!(account.held, dec!(50.0));
+        assert_eq!(account.available, dec!(50.0));
+        assert_eq!(account.held, dec!(0.0));
         assert_eq!(account.total, dec!(50.0));
-        assert_eq!(account.locked, false);
+        assert_eq!(account.locked, true);
     }
 }
 
@@ -282,9 +282,9 @@ fn chargeback_withdrawal() {
 
     {
         let account: &Account = ledger.accounts.get(&client).expect("Failed to get account for client");
-        assert_eq!(account.available, dec!(100.0));
+        assert_eq!(account.available, dec!(50.0));
         assert_eq!(account.held, dec!(0.0));
-        assert_eq!(account.total, dec!(100.0));
+        assert_eq!(account.total, dec!(50.0));
         assert_eq!(account.locked, true);
     }
 }
