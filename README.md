@@ -9,7 +9,7 @@ The spec doc I was working from used both ```"withdraw"``` and ```"withdrawal"``
 ### Disputes
 The spec doc was also ambiguous in regards to disputes.  The description of how a dispute should be handled in terms of the ```Account``` balances (subtract the disputed amount from ```available```, and put it in ```held```; resolve moves back to ```available```, while chargebacks take the ```held``` amount) seemed to only apply to deposits, not withdrawals.  So I originally only implemented disputes for deposit transactions.
 
-But certainly there are disputes on withdrawals, so I thought for a long time about how those should work.  I eventually settled on the following: withdrawal disputes initially only lock the ```Account```, they don't move any money around; resolve removes the lock; and chargeback actually puts the disputed amount back into the ```Account``` as ```available```, but the account is still locked.
+But certainly there are disputes on withdrawals, so I thought for a long time about how those should work.  I eventually realized that the algorithm for disputing deposits does actually work, except the chargeback actually puts money back into the ```Account``` (unlike the deposit chargeback, which ultimately takes money out of the account).
 
 ### Amounts
 Most places in the code use ```rust_decimal::Decimal``` to represent amounts.  But for ```struct Transaction``` I used ```String```.  This was because the various dispute transaction types have an empty string for the amount, and ```rust_decimal::Decimal``` really didn't want to parse it.

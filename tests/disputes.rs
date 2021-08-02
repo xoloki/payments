@@ -198,10 +198,10 @@ fn dispute_withdrawal() {
 
     {
         let account: &Account = ledger.accounts.get(&client).expect("Failed to get account for client");
-        assert_eq!(account.available, dec!(50.0));
-        assert_eq!(account.held, dec!(0.0));
+        assert_eq!(account.available, dec!(00.0));
+        assert_eq!(account.held, dec!(50.0));
         assert_eq!(account.total, dec!(50.0));
-        assert_eq!(account.locked, true);
+        assert_eq!(account.locked, false);
     }
 }
 
@@ -229,14 +229,14 @@ fn resolve_withdrawal() {
 
     ledger.process(&dispute).expect("Failed to dispute withdrawal");
 
-    let chargeback = Transaction {
+    let resolve = Transaction {
         tx_type: RESOLVE.to_string(),
         client: client,
         tx: tx+1,
         amount: "".to_string(),
     };
 
-    ledger.process(&chargeback).expect("Failed to resolve withdrawal");
+    ledger.process(&resolve).expect("Failed to resolve withdrawal");
 
     {
         let account: &Account = ledger.accounts.get(&client).expect("Failed to get account for client");
